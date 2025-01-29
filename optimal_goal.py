@@ -2,7 +2,7 @@ import numpy as np
 import random
 from collections import deque
 # Path to the file
-file_path = 'testout.txt'
+file_path = 'testout1.txt'
 
 # Read the file and preprocess it
 with open(file_path, 'r') as file:
@@ -13,11 +13,13 @@ cleaned_data = [line.replace('[', '').replace(']', '').strip() for line in lines
 
 # Convert to a NumPy array
 matrix = np.array([list(map(int, line.split())) for line in cleaned_data])
+print(np.sum(matrix))
+print(matrix.shape)
 
 
 np.set_printoptions(threshold=np.inf,linewidth=1000)
 #print(matrix)
-
+print(matrix[50][78])
 
 start = (50, 78)
 
@@ -45,7 +47,7 @@ def bfs(matrix, start):
         y, x = current_position
         
         # Print or store the current position as you're visiting it
-        print(f"Visited: {current_position}")
+        #print(f"Visited: {current_position}")
         
         # Goal condition: if you have a specific goal, you can check here
         # For now, the search will stop when there are no more valid moves.
@@ -58,17 +60,21 @@ def bfs(matrix, start):
                 visited.add(new_position)
                 matrix[new_position[0],new_position[1]] = 8
                 # Print the new position after moving
-                print(f"Moving to: {new_position}")
+                #print(f"Moving to: {new_position}")
 
         # You can modify this condition if you want a specific stop or goal logic
         if len(queue) == 0:
             print("No valid moves left.")
             break
 
+        #print(visited)
+
 # Run BFS
 bfs(matrix, start)
 
 
 
+
+
+
 np.set_printoptions(threshold=np.inf,linewidth=1000)
-print(matrix)
