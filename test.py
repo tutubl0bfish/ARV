@@ -169,8 +169,8 @@ min_cost_cell, min_cost = find_min_cost(cell_costs)
 print(f"\nCell with Minimum Cost: {min_cost_cell}, Minimum Cost: {min_cost:.2f}")
 
 cost_map = generate_cost_map(matrix, cell_costs)
-visualize_cost_map(cost_map)
-visualize_matrix_with_goal(matrix, start, min_cost_cell)
+# visualize_cost_map(cost_map)
+# visualize_matrix_with_goal(matrix, start, min_cost_cell)
 
 
 

@@ -12,7 +12,8 @@ with open(file_path, 'r') as file:
 cleaned_data = [line.replace('[', '').replace(']', '').strip() for line in lines]
 
 # Convert to a NumPy array
-matrix = np.array([list(map(int, line.split())) for line in cleaned_data])
+matrix_ones= np.array([list(map(int, line.split())) for line in cleaned_data])
+matrix = matrix_ones* 127
 print(np.sum(matrix))
 print(matrix.shape)
 
