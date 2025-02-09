@@ -80,7 +80,7 @@ def calculate_cost(start, current, rows, cols, edge_penalty_factor=0.2, distance
         weighted_distance += start_penalty_factor  # Add penalty to move away from the start
 
     # Final cost
-    cost = 4*(1/weighted_distance) + edge_penalty_factor * (1 / (edge_penalty + 1)) + 2*(1/min_distance_to_obstacle)
+    cost = 4*(1/weighted_distance) + edge_penalty_factor * (1 / (edge_penalty + 1)) + 2*(1/(min_distance_to_obstacle+1))
     return cost
 
 # This is used to get the cost from Maaz's new costmap. 
@@ -102,7 +102,7 @@ def cost_from_new_map(start, current, rows, cols, edge_penalty_factor=0.2, dista
 
     # Cost from matrix/obstacles. May be more effcient to eliminate 0-values in the costmap first.
     #high: more obstacle-y
-    obstacle_cost = max(matrix[y, x], min_distance)
+    obstacle_cost = max(matrix[y_current, x_current], min_distance)
 
     # Edge penalty
     edge_penalty = min(x_current, cols - x_current - 1, y_current, rows - y_current - 1)
@@ -139,7 +139,7 @@ def bfs_with_cost(matrix, start):
         # Explore neighbors
         for dy, dx in directions:
             ny, nx = y + dy, x + dx
-            # Update with new costmap: before, used matrix[ny, nx] == 0. 100 is the cost assigned to walls/obstacles
+            # Update with new costmap: before, used matrix[ny, nx] == 1. 100 is the cost assigned to walls/obstacles
             if 0 <= ny < rows and 0 <= nx < cols and matrix[ny, nx] < 100 and (ny, nx) not in visited:
                 queue.append((ny, nx))
                 visited.add((ny, nx))
