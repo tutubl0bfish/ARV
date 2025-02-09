@@ -83,6 +83,38 @@ def calculate_cost(start, current, rows, cols, edge_penalty_factor=0.2, distance
     cost = 4*(1/weighted_distance) + edge_penalty_factor * (1 / (edge_penalty + 1)) + 2*(1/min_distance_to_obstacle)
     return cost
 
+# This is used to get the cost from Maaz's new costmap. 
+# This method relies on just getting the cost from the map.
+# Depending on info on the map, may be necessary to alter existing cost function to not include distance to obstacle penalties.
+def cost_from_new_map(start, current, rows, cols, edge_penalty_factor=0.2, distance_weight=0.09, min_distance=1e-6, start_penalty_factor=100, matrix_penalty_factor = 2):
+    y_start, x_start = start
+    y_current, x_current = current
+
+    # Euclidean distance
+    euclidean_distance = math.sqrt((x_current - x_start)**2 + (y_current - y_start)**2)
+    
+    # Ensure the distance is not zero when current == start
+    if euclidean_distance == 0:
+        euclidean_distance = min_distance  # Avoid zero distance
+
+    # Apply weight to the distance
+    weighted_distance = distance_weight * euclidean_distance
+
+    # Cost from matrix/obstacles. May be more effcient to eliminate 0-values in the costmap first.
+    #high: more obstacle-y
+    obstacle_cost = max(matrix[y, x], min_distance)
+
+    # Edge penalty
+    edge_penalty = min(x_current, cols - x_current - 1, y_current, rows - y_current - 1)
+    edge_penalty = max(0, edge_penalty)  # Ensure non-negative
+
+    # Penalize if the current point is too close to the start
+    if euclidean_distance <= min_distance:
+        weighted_distance += start_penalty_factor  # Add penalty to move away from the start
+
+    # Final cost
+    cost = 4*(1/weighted_distance) + edge_penalty_factor * (1 / (edge_penalty + 1)) + matrix_penalty_factor * obstacle_cost
+    return cost
 
 
 # BFS Function
@@ -99,14 +131,16 @@ def bfs_with_cost(matrix, start):
         y, x = queue.popleft()
 
         # Calculate cost for this cell
-        cost = calculate_cost(start, (y, x), rows, cols)
+        #cost = calculate_cost(start, (y, x), rows, cols)
+        cost = cost_from_new_map(start, (y, x), rows, cols)
         total_cost += cost
         cell_costs.append(((y, x), cost))
 
         # Explore neighbors
         for dy, dx in directions:
             ny, nx = y + dy, x + dx
-            if 0 <= ny < rows and 0 <= nx < cols and matrix[ny, nx] == 1 and (ny, nx) not in visited:
+            # Update with new costmap: before, used matrix[ny, nx] == 0. 100 is the cost assigned to walls/obstacles
+            if 0 <= ny < rows and 0 <= nx < cols and matrix[ny, nx] < 100 and (ny, nx) not in visited:
                 queue.append((ny, nx))
                 visited.add((ny, nx))
 
