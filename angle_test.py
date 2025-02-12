@@ -4,7 +4,7 @@ import time
 import matplotlib.pyplot as plt
 
 
-file_path = 'testout2.txt'
+file_path = 'testout22.txt'
 
 start_time = time.process_time()
 
@@ -27,7 +27,7 @@ def get_angle_difference(to_angle, from_angle):
 
 def queue_based_exploration(occ_grid, cur_gps, goal_gps, orientation, 
                               latitude_length=111086.2, longitude_length=81978.2):
-    grid_width, grid_height = occ_grid.shape[1], occ_grid.shape[0]
+    cols, rows = occ_grid.shape[1], occ_grid.shape[0]
     robot_x, robot_y = 78, 47
     max_depth = 50
     waypoint_weight = 10.0
@@ -61,8 +61,9 @@ def queue_based_exploration(occ_grid, cur_gps, goal_gps, orientation,
                 continue
             visted.add((x, y))
             
-            if x < 0 or x >= grid_width or y < 0 or y >= grid_height:
+            if x < 0 or x >= cols or y < 0 or y >= rows:
                 continue
+            
             if occ_grid[y][x] != 1:
                 continue
 
@@ -125,16 +126,10 @@ west_m_true_north = delta_lon_true_north * 81978.2
 
 desired_heading_true_north = math.atan2(west_m_true_north, north_m_true_north)
 
-
 robot_orientation_0 = math.radians(0)
-
 robot_orientation_90 = math.radians(90)
-
 robot_orientation_180 = math.radians(180)
-
 robot_orientation_270 = math.radians(270)
-
-
 
 
 best_cell, desired_heading_global = queue_based_exploration(

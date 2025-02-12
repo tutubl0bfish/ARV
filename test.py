@@ -24,7 +24,19 @@ print(matrix.shape)
 
 
 np.set_printoptions(threshold=np.inf,linewidth=1000)
-start = (50, 78)
+
+# Why do we need to have a seperate start_bfs and robot_pose you may ask?
+# if you think about it, the robot_pose is in unknown space from CV's perspective
+# So if we bfs from the robot_pose, the algo won't work 
+# (you won't add any neighbors to the queue in the first iteration)
+# Buuuuuut if we do angle calculations from the start_bfs, we could get skewed results
+# So now you need 
+# Sincelry,
+# Maaz , self documenting code since 2004
+
+start_bfs = (47, 78)
+robot_pose = (55, 78)
+
 
 # Directions: Vertical, Horizontal, Diagonal
 # directions = [(-1, 0),   # Up
@@ -47,15 +59,55 @@ def is_valid_move(position, matrix, visited):
     rows, cols = matrix.shape
     return 0 <= y < rows and 0 <= x < cols and matrix[y, x] == 1 and position not in visited
 
+# assumes radians angles
+def get_angle_difference(to_angle, from_angle):
+    delta = to_angle - from_angle
+    delta = (delta + math.pi) % (2 * math.pi) - math.pi
+    return delta
 
+def find_desired_heading( cur_gps, goal_gps, orientation):
+    # lat long degress to meter ratio for the state of Michigan
+    latitude_length=111086.2 
+    longitude_length=81978.2 
+        
+    delta_lat = goal_gps[0] - cur_gps[0]
+    delta_lon = cur_gps[1] - goal_gps[1]
+    north_m = delta_lat * latitude_length
+    west_m = delta_lon * longitude_length
+    
+    # desired_heading_global = math.atan2(west_m, north_m)
+    desired_heading_x = math.cos(orientation) * west_m + math.sin(orientation) * north_m
+    desired_heading_y = -math.sin(orientation) * west_m + math.cos(orientation) * north_m
+    desired_heading_global = math.atan2(desired_heading_y, desired_heading_x) - math.pi
+    return desired_heading_global
 
-def calculate_cost(start, current, rows, cols, edge_penalty_factor=0.2, distance_weight=0.09, min_distance=1e-6, start_penalty_factor=100):
+def get_angle_to_goal_pentaly(canidate_node, real_robot_pos, orientation, desired_heading_global):
+    y,x = canidate_node
+    outside_point_y, outside_point_x = real_robot_pos
+    dx = x - outside_point_x
+    dy = y - outside_point_y
+    cell_dir_local = math.atan2(dy, dx)  
+
+    global_cell_dir = orientation + cell_dir_local + math.pi * 0.5
+
+    heading_error = abs(get_angle_difference(desired_heading_global, global_cell_dir))
+    heading_error_deg = math.degrees(heading_error)
+    return heading_error_deg
+ 
+def calculate_cost(real_rob_pose, orientation ,desire_heading, start, current, rows, cols):
+    edge_penalty_factor=0.2
+    distance_weight=0.09
+    min_distance=1e-6
+    start_penalty_factor=100
+    angle_pen_weight = 0
+    obs_factor = 10000
+    
     y_start, x_start = start
     y_current, x_current = current
-
+    
     # Euclidean distance
     euclidean_distance = math.sqrt((x_current - x_start)**2 + (y_current - y_start)**2)
-    
+
     # Ensure the distance is not zero when current == start
     if euclidean_distance == 0:
         euclidean_distance = min_distance  # Avoid zero distance
@@ -63,34 +115,30 @@ def calculate_cost(start, current, rows, cols, edge_penalty_factor=0.2, distance
     # Apply weight to the distance
     weighted_distance = distance_weight * euclidean_distance
 
-    # Find zero coordinates
-    zero_coordinates = list(zip(*np.where(matrix == 0)))
-
-    #Whats the closest obstacle
-    distances_to_zeros = [math.sqrt((x_current - x_zero)**2 + (y_current - y_zero)**2) for y_zero, x_zero in zero_coordinates]
-    min_distance_to_obstacle = min(distances_to_zeros)
-
-
+    # Pull from inflation layer 
+    min_distance_to_obstacle = matrix[y_current][x_current]
+    
+    angle_pen = get_angle_to_goal_pentaly(current, real_rob_pose, orientation, desire_heading)
     # Edge penalty
     edge_penalty = min(x_current, cols - x_current - 1, y_current, rows - y_current - 1)
     edge_penalty = max(0, edge_penalty)  # Ensure non-negative
-
+    
+    close_pen = 0
     # Penalize if the current point is too close to the start
     if euclidean_distance <= min_distance:
-        weighted_distance += start_penalty_factor  # Add penalty to move away from the start
+        close_pen += start_penalty_factor  # Add penalty to move away from the start
 
     # Final cost
-    cost = 4*(1/weighted_distance) + edge_penalty_factor * (1 / (edge_penalty + 1)) + 2*(1/min_distance_to_obstacle)
+    cost = close_pen + 4*(1/weighted_distance) + obs_factor * min_distance_to_obstacle + edge_penalty_factor * (1 / (edge_penalty + 1)) + angle_pen * angle_pen_weight
     return cost
 
 
-
 # BFS Function
-def bfs_with_cost(matrix, start):
+def bfs_with_cost(robot_pose, matrix, start_bfs):
     rows, cols = matrix.shape
     visited = set()
-    queue = deque([start])
-    visited.add(start)
+    queue = deque([start_bfs])
+    visited.add(start_bfs)
 
     total_cost = 0
     cell_costs = []  # Store costs for analysis
@@ -99,7 +147,12 @@ def bfs_with_cost(matrix, start):
         y, x = queue.popleft()
 
         # Calculate cost for this cell
-        cost = calculate_cost(start, (y, x), rows, cols)
+        current_gps = (42.668086, -83.218446) # TODO get this from sensors
+        goal_gps = (42.6679277, -83.2193276) # TODO get this from publisher
+        robot_orientation_270 = math.radians(270) #TODO get this from sensors
+
+        d_heading = find_desired_heading(current_gps, goal_gps, robot_orientation_270)
+        cost = calculate_cost(robot_pose, robot_orientation_270, d_heading, start_bfs, (y, x), rows, cols)
         total_cost += cost
         cell_costs.append(((y, x), cost))
 
@@ -162,15 +215,16 @@ def visualize_matrix_with_goal(matrix, start, goal):
 # Run BFS
 
 
-cell_costs, total_cost = bfs_with_cost(matrix, start)
+cell_costs, total_cost = bfs_with_cost(robot_pose, matrix, start_bfs)
 
 min_cost_cell, min_cost = find_min_cost(cell_costs)
 
 print(f"\nCell with Minimum Cost: {min_cost_cell}, Minimum Cost: {min_cost:.2f}")
 
 cost_map = generate_cost_map(matrix, cell_costs)
+runtime = time.process_time() - start_time
 # visualize_cost_map(cost_map)
-# visualize_matrix_with_goal(matrix, start, min_cost_cell)
+visualize_matrix_with_goal(matrix, start_bfs, min_cost_cell)
 
 
 
@@ -182,5 +236,4 @@ cost_map = generate_cost_map(matrix, cell_costs)
 
 print(matrix[27][102])
 
-runtime = time.process_time() - start_time
-print("Time: ", runtime)
+print("Time w/o visualization: ", runtime)

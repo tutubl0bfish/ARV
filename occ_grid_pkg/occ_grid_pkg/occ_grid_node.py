@@ -15,8 +15,9 @@ class OccupancyGridPublisher(Node):
         self.timer = self.create_timer(1.0, self.publish_occupancy_grid)  # Publish every 1 second
 
     def load_occupancy_grid(self):
-        file_path = 'testout2.txt'
-
+        print("HERE")
+        file_path = '/home/maaz/ws/src/ARV/occ_grid_pkg/occ_grid_pkg/testout22.txt'
+        print("Hi")
         with open(file_path, 'r') as file:
             lines = file.readlines()
 
@@ -30,7 +31,7 @@ class OccupancyGridPublisher(Node):
                     self.get_logger().info('MF did not see something right ')
                     print(i)
         flipped = np.where(matrix_ones == 1, 0, 1)
-        matrix = flipped * 127
+        matrix = flipped * 100
 
         self.grid_msg = OccupancyGrid()
         self.grid_msg.header.frame_id = 'map'
@@ -50,6 +51,7 @@ class OccupancyGridPublisher(Node):
         # self.get_logger().info('P1ublished Occupancy Grid')
 
 def main(args=None):
+    print("MAIN")
     rclpy.init(args=args)
     node = OccupancyGridPublisher()
     rclpy.spin(node)
