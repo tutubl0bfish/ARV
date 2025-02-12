@@ -4,9 +4,14 @@ from collections import deque
 import math
 import matplotlib.pyplot as plt
 import time
-# Path to the file
-file_path = 'testout2.txt'
 
+
+global using_angle
+using_angle = True
+# Path to the file
+
+
+file_path = 'testout2.txt'
 start_time = time.process_time()
 
 
@@ -55,6 +60,9 @@ directions = [(-1, -1),  # Up-left (diagonal)
 
 # Function to check if a position is valid
 def is_valid_move(position, matrix, visited):
+    
+    
+
     y, x = position
     rows, cols = matrix.shape
     return 0 <= y < rows and 0 <= x < cols and matrix[y, x] == 1 and position not in visited
@@ -94,14 +102,20 @@ def get_angle_to_goal_pentaly(canidate_node, real_robot_pos, orientation, desire
     heading_error_deg = math.degrees(heading_error)
     return heading_error_deg
  
-def calculate_cost(real_rob_pose, orientation ,desire_heading, start, current, rows, cols):
+
+ #TODO combine first 3 args into a tuple
+def calculate_cost(real_rob_pose, orientation ,desire_heading, start, current, rows, cols): 
     edge_penalty_factor=0.2
     distance_weight=0.09
     min_distance=1e-6
     start_penalty_factor=100
-    angle_pen_weight = 0
+    angle_pen_weight = 10
     obs_factor = 10000
     
+    angle_pen = 0
+    if using_angle:
+        angle_pen = get_angle_to_goal_pentaly(current, real_rob_pose, orientation, desire_heading)
+
     y_start, x_start = start
     y_current, x_current = current
     
@@ -118,7 +132,6 @@ def calculate_cost(real_rob_pose, orientation ,desire_heading, start, current, r
     # Pull from inflation layer 
     min_distance_to_obstacle = matrix[y_current][x_current]
     
-    angle_pen = get_angle_to_goal_pentaly(current, real_rob_pose, orientation, desire_heading)
     # Edge penalty
     edge_penalty = min(x_current, cols - x_current - 1, y_current, rows - y_current - 1)
     edge_penalty = max(0, edge_penalty)  # Ensure non-negative
@@ -134,27 +147,34 @@ def calculate_cost(real_rob_pose, orientation ,desire_heading, start, current, r
 
 
 # BFS Function
-def bfs_with_cost(robot_pose, matrix, start_bfs):
+
+def bfs_with_cost(robot_pose, matrix, start_bfs, current_gps=0, goal_gps=0, robot_orientation=0):
+     # Calculate cost for this cell
+    current_gps = (42.668086, -83.218446) # TODO get this from sensors
+    goal_gps = (42.6679277, -83.2193276) # TODO get this from publisher
+    robot_orientation = math.radians(270) #TODO get this from sensors
+
+
     rows, cols = matrix.shape
     visited = set()
     queue = deque([start_bfs])
     visited.add(start_bfs)
 
-    total_cost = 0
-    cell_costs = []  # Store costs for analysis
+    min_cell_cost = float('inf')
+    best_cell = None
 
     while queue:
         y, x = queue.popleft()
 
-        # Calculate cost for this cell
-        current_gps = (42.668086, -83.218446) # TODO get this from sensors
-        goal_gps = (42.6679277, -83.2193276) # TODO get this from publisher
-        robot_orientation_270 = math.radians(270) #TODO get this from sensors
-
-        d_heading = find_desired_heading(current_gps, goal_gps, robot_orientation_270)
-        cost = calculate_cost(robot_pose, robot_orientation_270, d_heading, start_bfs, (y, x), rows, cols)
-        total_cost += cost
-        cell_costs.append(((y, x), cost))
+       
+        d_heading = 0
+        if using_angle:
+            d_heading = find_desired_heading(current_gps, goal_gps, robot_orientation)
+        
+        cost = calculate_cost(robot_pose, robot_orientation, d_heading, start_bfs, (y, x), rows, cols)
+        if cost < min_cell_cost:
+            min_cell_cost = cost
+            best_cell = (y, x)
 
         # Explore neighbors
         for dy, dx in directions:
@@ -163,24 +183,8 @@ def bfs_with_cost(robot_pose, matrix, start_bfs):
                 queue.append((ny, nx))
                 visited.add((ny, nx))
 
-    return cell_costs, total_cost
+    return best_cell, min_cell_cost
 
-def find_min_cost(cell_costs):
-    min_cost = float('inf')  # Initialize to infinity
-    min_cost_cell = None
-
-    for cell, cost in cell_costs:
-        if cost < min_cost:
-            min_cost = cost
-            min_cost_cell = cell
-
-    return min_cost_cell, min_cost
-
-def generate_cost_map(matrix, cell_costs):
-    cost_map = np.full(matrix.shape, np.inf)  # Initialize cost map with infinity
-    for (y, x), cost in cell_costs:
-        cost_map[y, x] = cost  # Fill in the costs for visited cells
-    return cost_map
 
 # Visualize the cost map
 def visualize_cost_map(cost_map):
@@ -215,13 +219,11 @@ def visualize_matrix_with_goal(matrix, start, goal):
 # Run BFS
 
 
-cell_costs, total_cost = bfs_with_cost(robot_pose, matrix, start_bfs)
+min_cost_cell, min_cost  = bfs_with_cost(robot_pose, matrix, start_bfs)
 
-min_cost_cell, min_cost = find_min_cost(cell_costs)
 
 print(f"\nCell with Minimum Cost: {min_cost_cell}, Minimum Cost: {min_cost:.2f}")
 
-cost_map = generate_cost_map(matrix, cell_costs)
 runtime = time.process_time() - start_time
 # visualize_cost_map(cost_map)
 visualize_matrix_with_goal(matrix, start_bfs, min_cost_cell)
